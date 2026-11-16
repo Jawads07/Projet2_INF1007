@@ -1,7 +1,7 @@
 import os
 
 from donnees import charger_donnees, nettoyer_donnees
-
+from graphiques import enregistrer_distribution_notes
 
 def main() -> None:
     """Charge, examine et nettoie les données du projet.
@@ -42,6 +42,13 @@ def main() -> None:
     print((df["User_Score"] == "tbd").sum())
 
     df_nettoye = nettoyer_donnees(df)
+
+    chemin_graphique = os.path.join(
+        dossier_projet, "donnees", "distribution_notes.png"
+    )
+
+    enregistrer_distribution_notes(df_nettoye, chemin_graphique)
+    print("\nGraphique enregistré :", chemin_graphique)
 
     print("\nLignes avant nettoyage :", len(df))
     print("Lignes après nettoyage :", len(df_nettoye))

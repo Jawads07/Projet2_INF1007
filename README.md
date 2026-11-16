@@ -74,3 +74,56 @@ une référence prédisant toujours la moyenne des notes d'entraînement.
 
 - Lecture d'un CSV avec pandas :
   https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html
+
+  ## Tests
+
+Depuis le dossier principal :
+
+```powershell
+python -m pytest
+```
+
+Deux tests vérifient le chargement :
+- un fichier CSV existant est lu correctement;
+- un fichier absent déclenche FileNotFoundError.
+
+Ces tests passent localement et sur GitHub Actions.
+Le workflow relance les tests après chaque push.
+
+## Environnement de développement
+
+Nous utilisons Python 3.14, avec Anaconda sur notre poste.
+Les bibliothèques nécessaires sont indiquées dans requirements.txt.
+La CI utilise Python 3.14 sur Ubuntu.
+
+## Nettoyage réalisé
+
+La fonction travaille sur une copie du tableau et conserve les colonnes
+nécessaires au projet.
+
+Les colonnes numériques sont converties avec pandas. Les valeurs
+non convertibles, comme "tbd", deviennent des valeurs manquantes.
+Les lignes incomplètes sont retirées.
+
+Les notes de la presse doivent être comprises entre 0 et 100,
+et celles des joueurs entre 0 et 10, bornes incluses.
+
+Résultat : 6 826 lignes conservées sur 16 719, soit 9 893 retirées.
+Le CSV original reste inchangé.
+
+Cette suppression peut réduire la représentativité des données :
+les jeux sans notes complètes sont exclus.
+
+L'entraînement du modèle n'est pas encore implémenté.
+
+## Exploration des notes
+
+Le graphique donnees/distribution_notes.png présente la distribution
+des notes des joueurs dans les données conservées après nettoyage.
+
+Les observations se concentrent principalement entre 6 et 9,
+particulièrement entre 7 et 9. Les faibles notes sont peu représentées,
+ce qui pourrait limiter les prédictions du modèle pour ces valeurs.
+
+Chaque observation correspond à une ligne du CSV; un même titre
+peut apparaître sur plusieurs plateformes.
