@@ -15,7 +15,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.tree import DecisionTreeRegressor
 
-from donnees import CARACTERISTIQUES, CIBLE, nettoyer_donnees
+from donnees import (
+    CARACTERISTIQUES, CIBLE, Historique, Variable, creer_variables, nettoyer_donnees
+)
 from exceptions import DonneeInvalideError
 
 CATEGORIELLES = ["Platform", "Genre", "Rating"]
@@ -252,13 +254,13 @@ class Modele:
         try:
             with open(chemin_json, "r", encoding="utf-8") as fichier:
                 metadonnees = json.load(fichier)
-        except json.JSONDecodeError as erreur:
+        except (json.JSONDecodeError, UnicodeDecodeError) as erreur:
             raise DonneeInvalideError("Le JSON des métadonnées est invalide.") from erreur
         if not isinstance(metadonnees, dict) or metadonnees.get("format") != 1:
             raise DonneeInvalideError("Format des métadonnées non reconnu.")
         versions = metadonnees.get("versions", {})
         if not isinstance(versions, dict) or versions.get("scikit_learn") != sklearn.__version__:
-            raise DonneeInvalideError("Version scikit-learn différente : relancez main.py pour recréer le modèle.")
+            raise DonneeInvalideError("Version scikit-learn différente : exécutez python src/entrainer.py pour recréer le modèle.")
         try:
             with open(chemin_modele, "rb") as fichier:
                 modele = joblib.load(fichier)
@@ -269,6 +271,7 @@ class Modele:
         modele._verifier_entraine()
         if modele.metadonnees != metadonnees:
             raise DonneeInvalideError("Le modèle et les métadonnées ne correspondent pas.")
+        modele._metadonnees = metadonnees
         return modele
 
     def __str__(self) -> str:
@@ -279,3 +282,44 @@ class Modele:
         if evaluation is None:
             return "Arbre entraîné, évaluation à effectuer"
         return f"Arbre de profondeur maximale 5 : MAE test = {evaluation['mae_modele']:.3f}/10"
+
+
+class ServicePrediction:
+    """Étape 3 — Valide, prédit et enregistre sans dépendre de Tkinter."""
+
+    def __init__(self, modele: Modele, historique: "Historique") -> None:
+        """Compose modèle, historique et variables créées depuis les métadonnées.
+
+        Lève DonneeInvalideError si le modèle ou ses descriptions sont invalides.
+        """
+        self._modele = modele
+        self._historique = historique
+        self._variables = creer_variables(modele.metadonnees)
+
+    @property
+    def variables(self) -> list[Variable]:
+        """Renvoie une copie de la liste des variables typées."""
+        return list(self._variables)
+
+    def predire(self, saisies: dict[str, str]) -> float:
+        """Valide les cinq saisies, renvoie la note et l'ajoute à l'historique.
+
+        Lève DonneeInvalideError pour une saisie ou une note invalide. Propage
+        OSError si l'enregistrement échoue; aucun succès ne doit alors être annoncé.
+        N'entraîne jamais le modèle et ne lit pas le CSV original.
+        """
+        if set(saisies) != {v.nom for v in self._variables}:
+            raise DonneeInvalideError("Renseignez les cinq caractéristiques du jeu.")
+        entrees = {}
+        for variable in self._variables:
+            entrees[variable.nom] = variable.valider(saisies[variable.nom])
+        tableau = pd.DataFrame([entrees], columns=CARACTERISTIQUES)
+        note = float(self._modele.predire(tableau)[0])
+        if not np.isfinite(note) or not 0 <= note <= 10:
+            raise DonneeInvalideError("Le modèle a renvoyé une note invalide.")
+        self._historique.ajouter(entrees, note)
+        return note
+
+    def lire_historique(self) -> list[dict]:
+        """Renvoie l'historique; propage ses erreurs de format et d'accès."""
+        return self._historique.lire()

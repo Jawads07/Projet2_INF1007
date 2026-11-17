@@ -13,7 +13,7 @@
 | ChatGPT | Corriger les trois échecs de séparation sur le poste de l’équipe | Diagnostic d’une incompatibilité PyArrow et conversion des titres uniques en liste Python; ajout d’un cas de test de compatibilité | Erreur reproduite avec pandas 3.1.1 et PyArrow 26.0.1, puis 35 tests réussis après correction. Avec pandas 2.2.3 sans PyArrow : 34 réussis, un cas optionnel ignoré | Proposition initiale corrigée après vérification |
 
 Les explications complémentaires et références sont regroupées dans le README et
-la fiche de décisions. Les résultats du modèle seront ajoutés après son entraînement.
+la fiche de décisions. Les résultats du modèle et les contrôles de l’interface sont consignés ci-dessous.
 
 ## Étape 2B — Modèle et persistance
 
@@ -28,3 +28,21 @@ L'aide comprend des propositions de code pour ce module et ses tests, ainsi que
 les explications, références et vérifications. L'équipe reste responsable de leur
 compréhension et de leur adaptation; les validations A à D ne sont pas supposées
 avoir été réalisées.
+
+
+## Étape 3 — Interface, variables et historique
+
+| Outil | Ce qui a été demandé | Réponse reçue | Vérification faite | Décision |
+|---|---|---|---|---|
+| ChatGPT | Construire l'interface locale de l'étape 3 | Proposition de maquette et code Tkinter : champs issus des métadonnées, note, graphique intégré et onglet historique | Fenêtre ouverte sous Linux/Tk 9; cinq champs, axes, légende, résultat et deux onglets inspectés à deux tailles | Retenu pour intégration; validation D avec l'auxiliaire et essai Windows à confirmer |
+| ChatGPT | Utiliser l'héritage de manière utile | Proposition du parent abstrait Variable, des deux enfants et du service séparé de Tkinter | Tests de valider pour nombres et catégories : vide, texte, bornes inclusives, NaN, année entière et catégories inconnues | Retenu; callbacks et ABC documentés par les références officielles |
+| ChatGPT | Conserver les estimations sans modifier le CSV | Proposition de classe Historique, code JSON avec date et table de consultation | Deux prédictions retrouvées après fermeture/réouverture; erreurs de format et d'accès contrôlées | Retenu pour une utilisation locale, sans écriture concurrente |
+| ChatGPT | Empêcher un nouvel apprentissage à chaque ouverture | Déplacement de la préparation dans entrainer.py; main.py charge le modèle et ouvre la fenêtre | Ouverture et prédiction exécutées en rendant la lecture CSV et l'entraînement inutilisables; prédiction obtenue depuis la sauvegarde | Retenu; deux commandes distinctes expliquées dans README et DECISIONS |
+| ChatGPT | Vérifier le code et compléter les explications | Proposition des tests de l'étape 3, vérification de l'interface et révision des trois documents | 106 tests réussis avec pandas 3.1.1/PyArrow; 105 et un ignoré sans PyArrow. Contrôles graphiques séparés, historique d'essai exclu de l'archive | Retenu pour intégration; CI de cette révision et poste Windows à vérifier |
+| ChatGPT | Vérifier qu'un historique invalide reste intact | Relecture de l'enregistrement et ajout d'un contrôle du contenu avant ouverture en écriture | Cas ajouté : catégories vides, année décimale, nombre non fini et contenu non UTF-8 refusés; fichier existant inchangé | Première proposition renforcée après vérification |
+
+L'aide de cette étape comprend des propositions de code et de tests, des
+explications, du débogage et une révision des documents. Les essais décrits ont
+été effectués dans l'environnement de vérification indiqué au README; ils ne
+sont pas présentés comme des essais déjà réalisés sur le poste de l'équipe.
+Les validations pédagogiques et la compréhension du code restent à confirmer.

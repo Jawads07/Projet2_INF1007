@@ -1,6 +1,10 @@
-"""Étapes 1 et 2 — Chargement, nettoyage et séparation des observations."""
+"""Étapes 1 à 3 — Données, variables du formulaire et historique des prédictions."""
 
 import os
+import json
+import math
+from abc import ABC, abstractmethod
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -152,3 +156,209 @@ class JeuDeDonnees:
             f"{os.path.basename(self._chemin)} : {len(self._originales)} lignes brutes, "
             f"{len(self._nettoyees)} lignes nettoyées"
         )
+
+
+# Étape 3 — Une même méthode valider, deux comportements selon le type de variable.
+LIBELLES = {
+    "Platform": "Plateforme", "Genre": "Genre", "Year_of_Release": "Année de sortie",
+    "Rating": "Classification d'âge", "Critic_Score": "Note de la presse",
+}
+
+
+class Variable(ABC):
+    """Classe parente des caractéristiques décrites dans les métadonnées."""
+
+    def __init__(self, nom: str) -> None:
+        """Conserve le nom; lève DonneeInvalideError s'il est vide."""
+        if not isinstance(nom, str) or not nom.strip():
+            raise DonneeInvalideError("Le nom d'une variable doit être renseigné.")
+        self._nom = nom
+
+    @property
+    def nom(self) -> str:
+        """Renvoie le nom de colonne, sans modifier l'état."""
+        return self._nom
+
+    @property
+    def libelle(self) -> str:
+        """Renvoie un libellé lisible pour les messages et les champs."""
+        return LIBELLES.get(self._nom, self._nom)
+
+    @abstractmethod
+    def valider(self, valeur: str) -> str | int | float:
+        """Renvoie la saisie convertie; lève DonneeInvalideError si invalide."""
+        raise NotImplementedError
+
+    def __str__(self) -> str:
+        """Renvoie le libellé de la caractéristique."""
+        return self.libelle
+
+
+class VariableNumerique(Variable):
+    """Valide un nombre dans l'intervalle observé pendant l'entraînement."""
+
+    def __init__(self, nom: str, minimum: float, maximum: float, entier: bool = False) -> None:
+        """Conserve les bornes; lève DonneeInvalideError si non finies ou inversées."""
+        super().__init__(nom)
+        if not math.isfinite(minimum) or not math.isfinite(maximum) or minimum > maximum:
+            raise DonneeInvalideError("Les limites numériques du modèle sont invalides.")
+        self._minimum = minimum
+        self._maximum = maximum
+        self._entier = entier
+
+    @property
+    def minimum(self) -> float:
+        """Renvoie la borne inférieure inclusive."""
+        return self._minimum
+
+    @property
+    def maximum(self) -> float:
+        """Renvoie la borne supérieure inclusive."""
+        return self._maximum
+
+    @property
+    def entier(self) -> bool:
+        """Indique si la saisie doit être entière."""
+        return self._entier
+
+    def valider(self, valeur: str) -> int | float:
+        """Convertit la saisie; accepte la virgule décimale et refuse vide/NaN/hors limites."""
+        if not isinstance(valeur, str) or not valeur.strip():
+            raise DonneeInvalideError(f"{self.libelle} : saisissez une valeur.")
+        try:
+            nombre = float(valeur.strip().replace(",", "."))
+        except ValueError as erreur:
+            raise DonneeInvalideError(f"{self.libelle} : saisissez un nombre.") from erreur
+        if not math.isfinite(nombre):
+            raise DonneeInvalideError(f"{self.libelle} : saisissez un nombre fini.")
+        if self._entier and not nombre.is_integer():
+            raise DonneeInvalideError(f"{self.libelle} : saisissez une année entière.")
+        if not self._minimum <= nombre <= self._maximum:
+            raise DonneeInvalideError(
+                f"{self.libelle} : valeur attendue entre {self._minimum:g} et {self._maximum:g}."
+            )
+        return int(nombre) if self._entier else nombre
+
+
+class VariableCategorielle(Variable):
+    """Valide un choix parmi les catégories apprises et sauvegardées."""
+
+    def __init__(self, nom: str, valeurs: list[str]) -> None:
+        """Copie les choix; lève DonneeInvalideError si aucun choix valide n'est fourni."""
+        super().__init__(nom)
+        if not valeurs or any(not isinstance(v, str) or not v.strip() for v in valeurs):
+            raise DonneeInvalideError("Les catégories du modèle sont invalides.")
+        self._valeurs = list(valeurs)
+
+    @property
+    def valeurs(self) -> list[str]:
+        """Renvoie une copie des catégories possibles."""
+        return list(self._valeurs)
+
+    def valider(self, valeur: str) -> str:
+        """Renvoie le choix sans espaces; lève DonneeInvalideError si vide ou inconnu."""
+        if not isinstance(valeur, str) or not valeur.strip():
+            raise DonneeInvalideError(f"{self.libelle} : choisissez une valeur.")
+        choix = valeur.strip()
+        if choix not in self._valeurs:
+            raise DonneeInvalideError(f"{self.libelle} : choisissez une valeur de la liste.")
+        return choix
+
+
+def creer_variables(metadonnees: dict) -> list[Variable]:
+    """Construit les cinq variables depuis le JSON sauvegardé.
+
+    Renvoie une liste ordonnée; lève DonneeInvalideError pour un schéma incomplet,
+    une variable répétée, un type inattendu ou des limites invalides.
+    """
+    try:
+        descriptions = metadonnees["variables"]
+        variables = []
+        for description in descriptions:
+            nom = description["nom"]
+            if description["type"] == "numerique":
+                variable = VariableNumerique(
+                    nom, float(description["minimum"]), float(description["maximum"]),
+                    description.get("entier", False),
+                )
+            elif description["type"] == "categorielle":
+                variable = VariableCategorielle(nom, description["valeurs"])
+            else:
+                raise DonneeInvalideError("Type de variable non reconnu dans les métadonnées.")
+            variables.append(variable)
+        if [v.nom for v in variables] != CARACTERISTIQUES:
+            raise DonneeInvalideError("Les cinq caractéristiques du modèle sont incohérentes.")
+    except (KeyError, TypeError, ValueError) as erreur:
+        raise DonneeInvalideError("Les descriptions des caractéristiques sont incomplètes.") from erreur
+    return variables
+
+
+class Historique:
+    """Conserve les prédictions en JSON, indépendamment de l'interface graphique."""
+
+    def __init__(self, chemin: str) -> None:
+        """Conserve le chemin; le fichier n'est créé qu'à la première prédiction."""
+        self._chemin = chemin
+
+    def _verifier_entrees(self, entrees: dict) -> None:
+        """Lève DonneeInvalideError si un enregistrement contient des champs invalides."""
+        if not isinstance(entrees, dict) or set(entrees) != set(CARACTERISTIQUES):
+            raise DonneeInvalideError("Les caractéristiques de l'historique sont invalides.")
+        for nom in ["Platform", "Genre", "Rating"]:
+            if not isinstance(entrees[nom], str) or not entrees[nom].strip():
+                raise DonneeInvalideError("Une catégorie de l'historique est invalide.")
+        for nom in ["Year_of_Release", "Critic_Score"]:
+            valeur = entrees[nom]
+            if isinstance(valeur, bool) or not isinstance(valeur, (int, float)) or not math.isfinite(valeur):
+                raise DonneeInvalideError("Un nombre de l'historique est invalide.")
+        annee = entrees["Year_of_Release"]
+        if annee <= 0 or int(annee) != annee or not 0 <= entrees["Critic_Score"] <= 100:
+            raise DonneeInvalideError("Les caractéristiques de l'historique sont hors limites.")
+
+    def lire(self) -> list[dict]:
+        """Renvoie les enregistrements, ou une liste vide si le fichier est absent.
+
+        Lève DonneeInvalideError pour un JSON invalide ou un format inattendu;
+        propage les erreurs d'accès. Ne modifie jamais le fichier.
+        """
+        if not os.path.exists(self._chemin):
+            return []
+        try:
+            with open(self._chemin, "r", encoding="utf-8") as fichier:
+                enregistrements = json.load(fichier)
+        except (json.JSONDecodeError, UnicodeDecodeError) as erreur:
+            raise DonneeInvalideError("Le fichier d'historique est illisible; il n'a pas été modifié.") from erreur
+        if not isinstance(enregistrements, list):
+            raise DonneeInvalideError("Le format de l'historique est invalide.")
+        for ligne in enregistrements:
+            if not isinstance(ligne, dict) or not isinstance(ligne.get("date"), str):
+                raise DonneeInvalideError("Un enregistrement de l'historique est invalide.")
+            self._verifier_entrees(ligne.get("entrees"))
+            note = ligne.get("prediction")
+            if (isinstance(note, bool) or not isinstance(note, (int, float)) or not math.isfinite(note)
+                    or not 0 <= note <= 10):
+                raise DonneeInvalideError("Un enregistrement de l'historique est invalide.")
+        return enregistrements
+
+    def ajouter(self, entrees: dict, prediction: float) -> None:
+        """Ajoute une prédiction; ne renvoie rien et préserve un historique illisible.
+
+        Lève DonneeInvalideError pour des entrées ou une note invalides. Les
+        erreurs d'accès sont propagées. Le JSON est fermé avant le retour.
+        """
+        self._verifier_entrees(entrees)
+        if (isinstance(prediction, bool) or not isinstance(prediction, (int, float)) or not math.isfinite(prediction)
+                or not 0 <= prediction <= 10):
+            raise DonneeInvalideError("La prédiction à enregistrer est invalide.")
+        lignes = self.lire()
+        lignes.append({
+            "date": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "entrees": dict(entrees), "prediction": float(prediction),
+        })
+        os.makedirs(os.path.dirname(self._chemin) or ".", exist_ok=True)
+        with open(self._chemin, "w", encoding="utf-8") as fichier:
+            json.dump(lignes, fichier, ensure_ascii=False, indent=2, allow_nan=False)
+
+    def __str__(self) -> str:
+        """Renvoie un libellé du fichier d'historique."""
+        return f"Historique : {os.path.basename(self._chemin)}"

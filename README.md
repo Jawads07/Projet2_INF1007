@@ -8,7 +8,6 @@ note de la presse (`Critic_Score`, sur 100). Les critiques de presse sont donc
 supposées déjà disponibles. Le titre sert au regroupement des observations,
 mais n'est jamais une entrée du modèle. Les ventes ne sont pas utilisées.
 
-
 ## Installation et exécution
 
 Depuis le dossier principal, avec le même interpréteur Python :
@@ -16,6 +15,7 @@ Depuis le dossier principal, avec le même interpréteur Python :
 ```powershell
 python -m pip install -r requirements.txt
 python -m pytest
+python src/entrainer.py
 python src/main.py
 ```
 
@@ -24,9 +24,18 @@ Un environnement virtuel est facultatif. Le poste de l'équipe utilise Anaconda
 avec Python 3.14; les vérifications décrites ci-dessous ont été réalisées sous
 Python 3.12. La CI est configurée pour Python 3.14 et doit être vérifiée après push.
 
-`main.py` est actuellement le script de préparation : il entraîne le modèle,
-l'évalue et régénère ses fichiers. L'interface de l'étape 3 utilisera
-`Modele.charger` sans lire le CSV ni réentraîner à chaque lancement.
+`entrainer.py` effectue les étapes 1 et 2 : lecture, préparation, apprentissage,
+évaluation et sauvegarde. L'exécuter une première fois avec le Python local,
+puis seulement si les données, choix de modèle ou versions changent.
+`main.py` ouvre ensuite l'interface avec `Modele.charger`, sans relire le CSV et
+sans entraîner. Il peut être lancé depuis un autre dossier car ses chemins sont
+construits à partir de son propre emplacement.
+
+Tkinter doit être disponible avec l'installation Python choisie. Pour le vérifier :
+`python -m tkinter` doit ouvrir une petite fenêtre. Ce module appartient à la
+bibliothèque standard, mais sa présence dépend de la distribution Python; il ne
+s'ajoute pas en écrivant `tkinter` dans requirements.txt. Consulter la documentation
+de la distribution s'il manque. Aucun serveur web n'est nécessaire.
 
 ## Étape 0 — Organisation
 
@@ -135,18 +144,76 @@ la MAE globale ne garantit pas la même qualité pour tous les jeux.
 - `modeles/metadonnees.json` : cinq entrées dans l'ordre, catégories et intervalles
   observés **dans l'entraînement**, cible, métriques, réglages et versions.
 - Le JSON contient aussi la distribution de cible d'entraînement et les importances
-  regroupées par variable, pour le futur graphique d'interface. Une importance
+  regroupées par variable, pour le graphique d'interface. Une importance
   reflète le découpage appris par l'arbre, pas une relation causale.
 
 Un contrôle vérifie que le rechargement produit les mêmes prédictions sans `fit`.
 Le chargement vérifie la correspondance entre modèle et JSON et la version de
-scikit-learn. Si cette version diffère, relancer `python src/main.py` avec le Python
+scikit-learn. Si cette version diffère, relancer `python src/entrainer.py` avec le Python
 local pour recréer **ensemble** les deux fichiers. Le modèle inclus dans l'archive
 a été généré avec scikit-learn 1.9.1; ne pas supposer sa compatibilité avec une autre
 version. Charger seulement les sauvegardes de confiance produites par le projet.
 
 La validation C (cible, métrique et modèle) n'est pas déclarée effectuée; la fiche
 de décisions contient les choix à présenter. Aucun accord de l'auxiliaire n'est inventé.
+
+## Étape 3 — Interface et historique
+
+La maquette `donnees/maquette_interface.png` décrit les deux onglets et peut être
+imprimée pour la discussion avec l'auxiliaire. Elle n'est pas une preuve
+d'approbation. Tkinter a été retenu pour une fenêtre locale avec peu de
+dépendances; l'accord technique D et la validation de la maquette restent à
+confirmer avec l'auxiliaire, comme A, B et C.
+
+- **Estimer une note** : plateforme, genre et classification sont des listes
+  déroulantes; année et note de presse sont des champs numériques. Les noms,
+  catégories, intervalles et caractère entier de l'année viennent des métadonnées
+  JSON vérifiées au chargement. Aucune liste de plateformes n'est copiée dans l'interface.
+- **Estimer la note** valide les cinq saisies, prédit et enregistre la note sur 10.
+  Une saisie vide, non numérique, non finie, une année décimale ou une valeur hors
+  intervalle affiche un message dans la fenêtre. La virgule décimale est acceptée.
+  Le résultat précédent est effacé en cas d'erreur.
+- **Graphique intégré** : histogramme des notes du train, lu depuis les effectifs
+  sauvegardés dans le JSON, avec un trait indiquant la dernière estimation valide.
+  Titre, axes et légende sont présents. La MAE de test est affichée comme qualité
+  globale; aucun pourcentage de confiance individuel n'est inventé.
+- **Historique** : table des dates, cinq entrées et notes prédites; les plus récentes
+  sont en premier. Les estimations valides sont conservées dans
+  `donnees/historique_predictions.json`, créé au premier usage et retrouvé après
+  fermeture. Le bouton Actualiser relit ce fichier. Réinitialiser efface le résultat
+  à l'écran et rétablit des valeurs permises, sans supprimer l'historique.
+
+L'historique est un seul document JSON, relu puis réécrit avec `with`, adapté à
+une application locale et peu d'estimations. Ce n'est pas une base multiutilisateur.
+Un fichier d'historique invalide est signalé et n'est pas remplacé automatiquement.
+Une erreur d'accès ne produit pas de faux message de succès. L'archive ne contient
+pas les prédictions fictives des vérifications.
+
+Les limites de l'interface sont celles observées sur train, donc plus étroites que
+les échelles théoriques : année 1985–2016 et presse 13–98 sur ce jeu de données.
+Par exemple, 100 est une note de presse possible en général, mais hors du domaine
+observé retenu ici. Ce choix limite l'extrapolation et est annoncé près des champs.
+Les catégories inconnues restent gérées dans la logique du modèle; la fenêtre
+propose seulement les catégories déjà observées.
+
+### Classes utilisées
+
+`Variable` est une classe abstraite. `VariableNumerique` et
+`VariableCategorielle` héritent de ses attributs et redéfinissent toutes deux
+`valider`. `ServicePrediction` parcourt les variables avec le même appel
+`variable.valider(...)` : c'est le polymorphisme. Les nombres et les choix sont
+ainsi contrôlés selon leur type sans placer ces calculs dans Tkinter.
+
+`Application` compose un service et les composants visuels. Le service compose
+un `Modele`, un `Historique` et cinq objets `Variable`. `JeuDeDonnees` et `Modele`
+conservent leur rôle des étapes précédentes. Les attributs internes sont préfixés
+par `_`; les propriétés de listes et métadonnées renvoient des copies. Les méthodes
+spéciales `__str__` donnent un résumé lisible des objets.
+
+Pour suivre le programme : `main` charge → `Application` reçoit le service → le
+bouton appelle `ServicePrediction.predire` → chaque variable valide sa saisie →
+`Modele.predire` calcule → `Historique.ajouter` conserve → la fenêtre affiche.
+L'entraînement reste dans le script distinct `entrainer.py`.
 
 ## Tests et couverture
 
@@ -156,17 +223,26 @@ python -m coverage run --source=src -m pytest
 python -m coverage report -m
 ```
 
-**65 cas passent** avec pandas 3.1.1 et PyArrow. Avec pandas 2.2.3 sans PyArrow :
-**64 passent et 1 est ignoré**, car ce test cible un stockage optionnel absent.
-Les tests couvrent les fichiers, le nettoyage, les bornes, les copies, la séparation,
-la MAE, la référence, la protection contre l'évaluation sur train, les catégories
-inconnues, l'exclusion de la cible, la sauvegarde et le rechargement.
+**106 cas passent** avec pandas 3.1.1 et PyArrow. Avec pandas 2.2.3 sans PyArrow :
+**105 passent et 1 est ignoré**, car ce test cible un stockage optionnel absent.
+Les tests couvrent les fichiers, le nettoyage, les limites, les copies, la séparation,
+la MAE, la référence, la protection contre les fuites de titres et de cible, la
+sauvegarde, les variables du formulaire, l'historique persistant ou invalide, et
+l'utilisation de la sauvegarde sans lecture CSV ni nouvel apprentissage.
 
-Couverture unitaire mesurée : **73 % des instructions de src**; données et
-exceptions 100 %, modèle 99 %. Le point d'entrée et les graphiques ont été exécutés
-séparément et inspectés; ils ne sont pas inclus dans cette couverture unitaire.
-Aucun seuil n'est exigé par les consignes. Une CI verte de cette révision reste à
-confirmer sur GitHub après push.
+La couverture unitaire globale est de **58 %** des instructions de src; elle
+inclut les modules graphiques et points d'entrée non appelés par pytest. Les
+composants de logique sont couverts séparément : données **98 %**, modèle **99 %**,
+exceptions **100 %**. Cette mesure n'est pas une mesure de qualité graphique et
+aucun seuil n'est exigé par les consignes.
+
+La fenêtre a également été exécutée dans une session graphique Linux sous
+Python 3.12/Tk 9 : estimation normale, vide/texte/NaN/hors intervalle, virgule
+décimale, résultat effacé après erreur, repère sur le graphique, deux prédictions
+retrouvées après réouverture, historique invalide préservé, ouverture par main.py
+sans CSV ni entraînement. L'affichage et les deux onglets ont été inspectés à
+1180×800 et 1000×700. Le lancement sous Windows par l'équipe et la nouvelle CI
+Python 3.14 restent à vérifier après intégration et push.
 
 Vérifications sous Python 3.12.14 :
 
@@ -187,18 +263,20 @@ installation. Le test spécifique à PyArrow est ignoré s'il n'est pas install�
 
 | Fichier ou dossier | Rôle |
 |---|---|
-| `src/donnees.py` | Chargement, nettoyage, séparation; classe JeuDeDonnees |
-| `src/modele.py` | Référence, pipeline, métrique, évaluation et persistance; classe Modele |
+| `src/donnees.py` | Chargement/nettoyage/séparation, variables et historique |
+| `src/modele.py` | Modèle, MAE, persistance et service de prédiction |
 | `src/exceptions.py` | DonneeInvalideError, levée puis interceptée explicitement |
 | `src/graphiques.py` | Figures d'exploration et d'évaluation |
-| `src/main.py` | Appels dans l'ordre du travail; lancement direct dans VS Code |
+| `src/entrainer.py` | Préparation et entraînement, étapes 1 et 2 |
+| `src/interface.py` | Fenêtre, contrôles, graphique intégré et table d’historique |
+| `src/main.py` | Ouverture de l’interface, étape 3; lancement direct dans VS Code |
 | `donnees/` | CSV original et graphiques enregistrés |
 | `modeles/` | Modèle ajusté et métadonnées JSON |
 | `tests/` | Tests pytest de la logique |
 | `pytest.ini` | Recherche des modules dans src et des tests dans tests |
 
 Les méthodes ont des annotations et docstrings. Les calculs renvoient leurs
-résultats, l'affichage est dans main. Les classes conservent leur état dans des
+résultats; l’affichage appartient à l’interface ou au script d’entraînement. Les classes conservent leur état dans des
 attributs internes; les propriétés renvoient des copies. Modele contient ses
 objets pipeline et référence (composition), et redéfinit `__str__`.
 Outil du chapitre 7 : la clé **lambda** trie les catégories des métadonnées sans
@@ -207,24 +285,33 @@ distinction de casse, pour des listes déroulantes lisibles et stables.
 `requirements.txt` contient pandas (tableaux), numpy (calculs vectorisés),
 scikit-learn (modèles), joblib (sauvegarde), matplotlib (figures), pytest et coverage
 (vérification). `joblib` est déclaré explicitement, même s'il peut être installé
-par scikit-learn, car le code l'importe directement. `os`, `copy`, `json` et
-`pickle` sont fournis avec Python. `pytest.ini` est facultatif en général, mais
+par scikit-learn, car le code l'importe directement. `os`, `copy`, `json`, `pickle`, `math`,
+`datetime`, `abc` et `tkinter` sont des modules de Python; Tkinter reste optionnel
+selon la distribution installée. `datetime` date les enregistrements, `math` vérifie
+les nombres finis et `abc` exprime le contrat commun des deux types de variables. `pytest.ini` est facultatif en général, mais
 retenu ici pour éviter de modifier sys.path et conserver le lancement direct.
 
 ## Suite du projet
 
-- Étape 3 : choix de technologie et maquette à présenter pour D, `interface.py`,
-  saisies construites depuis le JSON, contrôles de champs et d'intervalles,
-  prédiction, graphique Matplotlib et historique. Compléter les classes exigées,
-  notamment la classe parente et deux enfants avec redéfinition de méthode.
-- Étape 4 : audit complet, installation dans un dossier neuf, couverture finale,
-  documents finalisés, contributions réelles des deux membres et CI finale verte.
-- Étape 5 : cinq minutes d'exposé puis cinq minutes de questions, démo normale,
-  saisie invalide, graphique, parole partagée et plan B.
+- Étape 4 : audit complet des consignes, installation dans un dossier neuf,
+  vérification locale Windows, couverture finale, documents relus, contributions
+  réelles des deux membres et CI finale verte.
+- Étape 5 : cinq minutes d'exposé puis cinq minutes de questions; démonstration
+  normale, saisie invalide et graphique; parole partagée et plan B.
 
-L'interface n'est pas encore implémentée. L'historique des prédictions et
-l'héritage/polymorphisme sont donc encore à compléter. Les trois documents sont
-mis à jour par grande étape, sans inventer de validations ou de résultats.
+### Validations restant à confirmer
+
+| Point | Avec qui et ce qu'il faut présenter |
+|---|---|
+| A | Auxiliaire : domaine des jeux vidéo et question étudiée |
+| B | Auxiliaire : source/licence, taille, colonnes et limites du CSV |
+| C | Auxiliaire : cinq entrées, cible, séparation, MAE, référence et arbre; accord prévu avant entraînement, non confirmé ici |
+| D | Auxiliaire : choix Tkinter et maquette imprimée, accord prévu avant codage, non confirmé ici |
+| Vérifications d'équipe | Sous Windows : installation, tests, entraînement, ouverture de la fenêtre et reprise de l'historique; sur GitHub : CI de cette révision et contributions des deux membres |
+
+L'étape 3 est implémentée et vérifiée dans l'environnement décrit. Les tests ne
+remplacent pas les accords pédagogiques; leurs dates ne seront inscrites qu'après
+les échanges réels. Les documents sont mis à jour par grande étape.
 
 ## Notes de cours et références
 
@@ -247,4 +334,12 @@ sont documentés ici :
 - Histogramme : https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.hist.html
 - CI : https://docs.github.com/en/actions/tutorials/build-and-test-code/python
 
-La documentation de la technologie d'interface sera ajoutée au choix de l'étape 3.
+- Tkinter (fenêtre, variables et callbacks) : https://docs.python.org/3/library/tkinter.html
+- ttk (Combobox, Notebook et Treeview) : https://docs.python.org/3/library/tkinter.ttk.html
+- Matplotlib intégré dans Tk : https://matplotlib.org/stable/gallery/user_interfaces/embedding_in_tk_sgskip.html
+- Classe abstraite et abstractmethod : https://docs.python.org/3/library/abc.html
+- Historique JSON : https://docs.python.org/3/library/json.html
+
+Les callbacks et les composants Tkinter sont les outils nouveaux de l'étape 3.
+Ils sont isolés dans interface.py; les fonctions de calcul et de validation
+restent testables avec les notions de fonctions, classes et exceptions du cours.
