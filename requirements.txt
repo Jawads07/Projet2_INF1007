@@ -1,3 +1,6 @@
 pytest
 pandas
 matplotlib
+numpy
+scikit-learn
+coverage

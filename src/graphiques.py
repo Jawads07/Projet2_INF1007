@@ -1,3 +1,5 @@
+"""Étape 1 — Figures d’exploration, distinctes de la future interface.py."""
+
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -29,7 +31,7 @@ def enregistrer_distribution_notes(
 
     ax.set_title("Notes des joueurs — jeux conservés après nettoyage")
     ax.set_xlabel("Note des joueurs sur 10")
-    ax.set_ylabel("Nombre de jeux")
+    ax.set_ylabel("Nombre d’observations (jeu et plateforme)")
 
     fig.savefig(chemin, dpi=150, bbox_inches="tight")
     plt.close(fig)
