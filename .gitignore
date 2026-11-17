@@ -1,0 +1,11 @@
+# Fichiers générés localement, sans utilité dans le dépôt.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+.vscode/
+donnees/historique_predictions.json

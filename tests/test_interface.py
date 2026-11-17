@@ -215,3 +215,20 @@ def test_historique_encodage_invalide(modele: Modele, saisies: dict, tmp_path: P
     with pytest.raises(DonneeInvalideError, match="illisible"):
         ServicePrediction(modele, Historique(str(chemin))).predire(saisies)
     assert chemin.read_bytes() == b'\xff\xfe'
+
+
+@pytest.mark.parametrize("note", [float("nan"), -1.0, 11.0])
+def test_resultat_modele_invalide_ne_touche_pas_historique(
+    modele: Modele, saisies: dict, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, note: float
+) -> None:
+    """Une réponse du modèle impossible n'efface ni n'ajoute une estimation enregistrée."""
+    chemin = tmp_path / "h.json"
+    service = ServicePrediction(modele, Historique(str(chemin)))
+    service.predire(saisies)
+    original = chemin.read_bytes()
+    def resultat_invalide(entrees: pd.DataFrame) -> list[float]:
+        return [note]
+    monkeypatch.setattr(modele, "predire", resultat_invalide)
+    with pytest.raises(DonneeInvalideError, match="note invalide"):
+        service.predire(saisies)
+    assert chemin.read_bytes() == original

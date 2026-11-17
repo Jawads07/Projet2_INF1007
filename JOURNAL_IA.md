@@ -9,7 +9,6 @@
 | ChatGPT | Tester la logique et automatiser la vérification | Proposition des tests pytest, fichiers temporaires, pytest.ini et workflow CI | Deux premiers tests validés localement et en CI; suite initiale de 34 cas exécutée dans l'environnement de vérification; nouvelle CI à confirmer après push | Retenu |
 | ChatGPT | Compléter la préparation de façon lisible | Proposition de code pour JeuDeDonnees, l'exception personnalisée et la séparation par titres | Exécution : 5 454 observations d'entraînement et 1 372 de test; contrôles d'absence de titres communs, reproductibilité et état de la classe | Retenu pour intégration et vérification sur le poste de l'équipe |
 | ChatGPT | Clarifier les choix et réduire les fichiers supplémentaires | Réorganisation des documents, retrait du guide de livraison et des fichiers vides; retrait des contraintes minimales de versions insuffisamment justifiées | Inventaire des fichiers, lecture des décisions et relance des tests | Révision retenue; pytest.ini conservé pour une raison technique explicitée |
-
 | ChatGPT | Corriger les trois échecs de séparation sur le poste de l’équipe | Diagnostic d’une incompatibilité PyArrow et conversion des titres uniques en liste Python; ajout d’un cas de test de compatibilité | Erreur reproduite avec pandas 3.1.1 et PyArrow 26.0.1, puis 35 tests réussis après correction. Avec pandas 2.2.3 sans PyArrow : 34 réussis, un cas optionnel ignoré | Proposition initiale corrigée après vérification |
 
 Les explications complémentaires et références sont regroupées dans le README et
@@ -46,3 +45,19 @@ explications, du débogage et une révision des documents. Les essais décrits o
 été effectués dans l'environnement de vérification indiqué au README; ils ne
 sont pas présentés comme des essais déjà réalisés sur le poste de l'équipe.
 Les validations pédagogiques et la compréhension du code restent à confirmer.
+
+
+## Étapes 4 et 5 — Consolidation et préparation de la démo
+
+| Outil | Ce qui a été demandé | Réponse reçue | Vérification faite | Décision |
+|---|---|---|---|---|
+| ChatGPT | Vérifier le projet contre l'énoncé et les notes | Audit du code, des documents et des exigences; ajout de tests sur le parcours complet et l'état après réentraînement | Énoncé relu; lambda, ABC et composition retrouvés dans les chapitres 7 et 11. 111 cas réussis avec PyArrow; 110 + un ignoré sans | Retenu; vérifications finales de l'équipe encore indiquées |
+| ChatGPT | Vérifier une installation indépendante | Clonage du dépôt public, installation des dépendances dans un environnement neuf et exécution des commandes documentées | Nettoyage, séparation et MAE reproduits; sauvegarde rechargée et fenêtre exécutée sous Linux. Couverture unitaire 58 % | Retenu; ne constitue pas un essai Windows |
+| ChatGPT | Conserver le travail courant de l'équipe | Comparaison du dépôt distant avec l'archive précédente | Modification du paragraphe Live Share et modèle généré avec sklearn 1.9.0 trouvés sur le dépôt; conservés plutôt que remplacés par l'ancienne version | Proposition adaptée à partir du dépôt réel |
+| ChatGPT | Vérifier la propreté du dépôt et la CI | Ajout de .gitignore et commande de retrait des caches déjà suivis, sans réécrire l'historique | Trois fichiers .pyc et des réglages locaux repérés dans le dépôt; étape 3, commit 7ad9be4, CI verte. Six commits, un seul auteur déclaré | Retenu; contributions réelles du coéquipier et CI du dernier commit à confirmer |
+| ChatGPT | Préparer l'exposé et une solution de secours | Proposition de minutage partagé, cas de démo, questions et PDF de trois captures | Démo normale et invalide exécutée, historique retrouvé; PDF rendu et inspecté. Aucune répétition de l'équipe déclarée | Retenu comme préparation, à répéter et expliquer par les deux membres |
+
+Cette consolidation comprend des propositions de tests et de documentation,
+une vérification technique et la préparation du support de secours. Les accords
+avec l'auxiliaire, la présentation, la compréhension du code et les contributions
+personnelles ne sont pas déduits des résultats automatiques.

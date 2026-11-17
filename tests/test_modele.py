@@ -237,3 +237,52 @@ def test_chargement_incoherent_refuse(
             json.dump(meta, fichier)
     with pytest.raises(DonneeInvalideError):
         Modele.charger(str(tmp_path))
+
+
+def test_reentrainement_remplace_etat(
+    entrainement: pd.DataFrame, test_independant: pd.DataFrame, tmp_path: Path
+) -> None:
+    """Un nouvel apprentissage remplace référence et métriques, sans conserver un ancien score."""
+    modele = Modele()
+    modele.entrainer(entrainement)
+    modele.evaluer(test_independant)
+    nouveau = entrainement.copy()
+    nouveau["User_Score"] = 5.0
+    nouveau["Name"] = [f"Nouveau {i}" for i in range(len(nouveau))]
+    modele.entrainer(nouveau)
+    assert modele.metadonnees["evaluation"] is None
+    assert modele.metadonnees["moyenne_reference"] == pytest.approx(5.0)
+    assert modele.predire(test_independant) == pytest.approx(np.full(len(test_independant), 5.0))
+    with pytest.raises(DonneeInvalideError, match="Évaluez"):
+        modele.sauvegarder(str(tmp_path))
+    resultat = modele.evaluer(test_independant)
+    assert resultat["mae_modele"] == pytest.approx(resultat["mae_reference"])
+
+
+def test_parcours_csv_modele_historique_preserve_original(
+    entrainement: pd.DataFrame, tmp_path: Path
+) -> None:
+    """La chaîne complète écrit ses sorties ailleurs et conserve chaque octet du CSV source."""
+    from donnees import Historique, JeuDeDonnees
+    from modele import ServicePrediction
+
+    csv = tmp_path / "source.csv"
+    with open(csv, "w", encoding="utf-8", newline="") as fichier:
+        entrainement.to_csv(fichier, index=False)
+    original = csv.read_bytes()
+    jeu = JeuDeDonnees(str(csv))
+    jeu.nettoyer()
+    train, test = jeu.separer()
+    modele = Modele()
+    modele.entrainer(train)
+    modele.evaluer(test)
+    dossier = str(tmp_path / "modeles")
+    modele.sauvegarder(dossier)
+    recharge = Modele.charger(dossier)
+    exemple = train[CARACTERISTIQUES].head(1)
+    saisies = {nom: str(exemple.iloc[0][nom]) for nom in CARACTERISTIQUES}
+    service = ServicePrediction(recharge, Historique(str(tmp_path / "historique.json")))
+    note = service.predire(saisies)
+    assert note == pytest.approx(float(modele.predire(exemple)[0]))
+    assert len(service.lire_historique()) == 1
+    assert csv.read_bytes() == original

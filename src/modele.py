@@ -49,7 +49,7 @@ def preparer_entrees(donnees: pd.DataFrame) -> pd.DataFrame:
     DonneeInvalideError pour une colonne absente, un tableau vide, un champ vide,
     une année non entière ou non positive et une note de presse hors [0,100].
     Les limites observées d'entraînement sont exposées dans les métadonnées;
-    leur contrôle par les champs d'interface sera réalisé à l'étape 3.
+    leur contrôle est réalisé par les variables du service de prédiction.
     """
     absentes = [nom for nom in CARACTERISTIQUES if nom not in donnees.columns]
     if absentes:

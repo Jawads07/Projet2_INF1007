@@ -22,7 +22,8 @@ python src/main.py
 Dans VS Code, **Run Python File** sur `src/main.py` fonctionne également.
 Un environnement virtuel est facultatif. Le poste de l'équipe utilise Anaconda
 avec Python 3.14; les vérifications décrites ci-dessous ont été réalisées sous
-Python 3.12. La CI est configurée pour Python 3.14 et doit être vérifiée après push.
+Python 3.12. La CI utilise Python 3.14 : le commit de l’étape 3 est vert; cette dernière
+révision devra aussi être vérifiée après push.
 
 `entrainer.py` effectue les étapes 1 et 2 : lecture, préparation, apprentissage,
 évaluation et sauvegarde. L'exécuter une première fois avec le Python local,
@@ -39,12 +40,14 @@ de la distribution s'il manque. Aucun serveur web n'est nécessaire.
 
 ## Étape 0 — Organisation
 
-Le dépôt prévu public et partagé est https://github.com/Jawads07/Projet2_INF1007.
+Le dépôt https://github.com/Jawads07/Projet2_INF1007 est public, vérifié le
+17 novembre 2026. L’accès du coéquipier reste à confirmer par l’équipe.
 Le workflow exécute pytest et mesure la couverture après chaque push. `pytest.ini`
 indique où trouver les modules (`src`) et les tests (`tests`), afin de conserver
 les mêmes imports simples dans le code et dans les tests.
 
-!!! Organisation du travail en équipe !!!
+### Organisation du travail en équipe
+
 Nous utilisons l'extension Visual Studio Live Share pour travailler en binôme sur une même session VS Code.
 
 Certaines modifications sont réalisées et relues ensemble avant d'être regroupées dans un commit correspondant à une partie cohérente du projet.
@@ -151,8 +154,9 @@ Un contrôle vérifie que le rechargement produit les mêmes prédictions sans `
 Le chargement vérifie la correspondance entre modèle et JSON et la version de
 scikit-learn. Si cette version diffère, relancer `python src/entrainer.py` avec le Python
 local pour recréer **ensemble** les deux fichiers. Le modèle inclus dans l'archive
-a été généré avec scikit-learn 1.9.1; ne pas supposer sa compatibilité avec une autre
-version. Charger seulement les sauvegardes de confiance produites par le projet.
+est celui conservé depuis le dépôt de l’équipe, généré avec scikit-learn 1.9.0
+(pandas 3.0.3, NumPy 2.4.6, joblib 1.5.3); ne pas supposer sa compatibilité avec
+une autre version. Charger seulement les sauvegardes de confiance produites par le projet.
 
 La validation C (cible, métrique et modèle) n'est pas déclarée effectuée; la fiche
 de décisions contient les choix à présenter. Aucun accord de l'auxiliaire n'est inventé.
@@ -223,12 +227,14 @@ python -m coverage run --source=src -m pytest
 python -m coverage report -m
 ```
 
-**106 cas passent** avec pandas 3.1.1 et PyArrow. Avec pandas 2.2.3 sans PyArrow :
-**105 passent et 1 est ignoré**, car ce test cible un stockage optionnel absent.
+**111 cas passent** avec pandas 3.1.1 et PyArrow. Avec pandas 2.2.3 sans PyArrow :
+**110 passent et 1 est ignoré**, car ce test cible un stockage optionnel absent.
 Les tests couvrent les fichiers, le nettoyage, les limites, les copies, la séparation,
 la MAE, la référence, la protection contre les fuites de titres et de cible, la
 sauvegarde, les variables du formulaire, l'historique persistant ou invalide, et
-l'utilisation de la sauvegarde sans lecture CSV ni nouvel apprentissage.
+l'utilisation de la sauvegarde sans lecture CSV ni nouvel apprentissage. La
+consolidation ajoute le parcours CSV → modèle → historique, le réentraînement
+qui invalide l'ancien score et le refus d'une réponse impossible du modèle.
 
 La couverture unitaire globale est de **58 %** des instructions de src; elle
 inclut les modules graphiques et points d'entrée non appelés par pytest. Les
@@ -241,8 +247,9 @@ Python 3.12/Tk 9 : estimation normale, vide/texte/NaN/hors intervalle, virgule
 décimale, résultat effacé après erreur, repère sur le graphique, deux prédictions
 retrouvées après réouverture, historique invalide préservé, ouverture par main.py
 sans CSV ni entraînement. L'affichage et les deux onglets ont été inspectés à
-1180×800 et 1000×700. Le lancement sous Windows par l'équipe et la nouvelle CI
-Python 3.14 restent à vérifier après intégration et push.
+1180×800 et 1000×700. Le lancement final sous Windows par l'équipe et la CI de cette révision
+restent à vérifier après intégration et push. Le modèle provenant du dépôt de
+l'équipe a aussi été chargé et utilisé sous Linux avec scikit-learn 1.9.0.
 
 Vérifications sous Python 3.12.14 :
 
@@ -257,7 +264,9 @@ Vérifications sous Python 3.12.14 :
 
 PyArrow 26.0.1 est présent seulement dans le second environnement. Les versions
 ne sont pas imposées dans requirements.txt; les tests doivent être relancés après
-installation. Le test spécifique à PyArrow est ignoré s'il n'est pas installé.
+installation. Le test spécifique à PyArrow est ignoré s'il n'est pas installé. Un troisième
+environnement reprend pandas 3.0.3, NumPy 2.4.6, scikit-learn 1.9.0 et joblib
+1.5.3 du modèle de l'équipe : 110 tests réussis, un cas PyArrow ignoré.
 
 ## Organisation et choix techniques
 
@@ -274,6 +283,8 @@ installation. Le test spécifique à PyArrow est ignoré s'il n'est pas install�
 | `modeles/` | Modèle ajusté et métadonnées JSON |
 | `tests/` | Tests pytest de la logique |
 | `pytest.ini` | Recherche des modules dans src et des tests dans tests |
+| `.gitignore` | Exclusion des caches, environnements et historique local |
+| `donnees/demo_secours.pdf` | Trois captures pour remplacer la démo si elle échoue |
 
 Les méthodes ont des annotations et docstrings. Les calculs renvoient leurs
 résultats; l’affichage appartient à l’interface ou au script d’entraînement. Les classes conservent leur état dans des
@@ -291,27 +302,115 @@ selon la distribution installée. `datetime` date les enregistrements, `math` v�
 les nombres finis et `abc` exprime le contrat commun des deux types de variables. `pytest.ini` est facultatif en général, mais
 retenu ici pour éviter de modifier sys.path et conserver le lancement direct.
 
-## Suite du projet
+## Étape 4 — Consolidation et vérification de remise
 
-- Étape 4 : audit complet des consignes, installation dans un dossier neuf,
-  vérification locale Windows, couverture finale, documents relus, contributions
-  réelles des deux membres et CI finale verte.
-- Étape 5 : cinq minutes d'exposé puis cinq minutes de questions; démonstration
-  normale, saisie invalide et graphique; parole partagée et plan B.
+L'audit reprend les sections 2 à 7 de l'énoncé. Les deux volets précédents ne sont
+pas réécrits pour simuler un autre déroulement : leurs résultats restent présents.
 
-### Validations restant à confirmer
+| Exigence | Élément vérifié |
+|---|---|
+| CSV admissible, au moins cinq entrées mixtes | 16 719 lignes, cinq entrées, trois catégorielles/deux numériques, cible User_Score, source et licence citées |
+| Lecture, nettoyage et séparation | os et with, copies, limites et valeurs manquantes; séparation par titres à graine 42 |
+| Référence, modèle, métrique et persistance | Moyenne du train, arbre limité, MAE NumPy comparée à sklearn, JSON et joblib cohérents |
+| Interface locale et saisies | Cinq champs issus du JSON, messages d'erreur, résultat /10, graphique et historique persistant |
+| Modules et POO | Six modules plus main; classes avec état, attributs internes, héritage Variable et deux enfants, composition, __str__ |
+| Fonctions et erreurs | Annotations et docstrings dans src; calcul séparé de l'affichage, exceptions précises et exception personnalisée |
+| Tests et couverture | 111 tests avec PyArrow ou 110 + un ignoré sans; couverture unitaire 58 %, logique données 98 % et modèle 99 % |
+| Graphiques et références | Histogramme enregistré, figure prédit/réel, figure intégrée et liens officiels pandas/sklearn/Tkinter |
+| Documents et IA | README, décisions et journal mis à jour; vérifications ayant corrigé une proposition consignées |
+| Installation neuve | Dépôt cloné; copie finale installée séparément avec un nouvel environnement, commandes de lancement vérifiées |
+| Git et CI | Dépôt public; étape 3, commit 7ad9be4, CI verte observée le 17 novembre 2026. Révision de consolidation à pousser puis contrôler |
 
-| Point | Avec qui et ce qu'il faut présenter |
+La vérification en environnement neuf installe uniquement requirements.txt,
+exécute pytest/coverage, régénère le modèle avec entrainer.py puis ouvre main.py.
+Elle reproduit 6 826 lignes propres, 5 454 lignes de train, 1 372 de test et les MAE
+annoncées. Les fenêtres ont été testées avec les dépendances récentes et avec la
+version scikit-learn du modèle de l'équipe. Ces essais sont réalisés sous Linux;
+l'équipe doit encore confirmer le fonctionnement final sur son Windows.
+
+`.gitignore` a été ajouté après constat de caches Python déjà versionnés dans le
+dépôt. Il ignore les fichiers régénérables, réglages personnels et prédictions
+locales. Il ne supprime aucun code, ne masque pas les commits et ne suffit pas à
+retirer ce qui est déjà suivi. Pour retirer uniquement les caches et réglages de
+l'index, en conservant leurs copies sur le PC :
+
+```powershell
+git rm -r --cached --ignore-unmatch src/__pycache__ tests/__pycache__ .vscode
+```
+
+### Points restant à confirmer par l'équipe
+
+| Point | Avec qui et quoi vérifier |
 |---|---|
 | A | Auxiliaire : domaine des jeux vidéo et question étudiée |
 | B | Auxiliaire : source/licence, taille, colonnes et limites du CSV |
-| C | Auxiliaire : cinq entrées, cible, séparation, MAE, référence et arbre; accord prévu avant entraînement, non confirmé ici |
-| D | Auxiliaire : choix Tkinter et maquette imprimée, accord prévu avant codage, non confirmé ici |
-| Vérifications d'équipe | Sous Windows : installation, tests, entraînement, ouverture de la fenêtre et reprise de l'historique; sur GitHub : CI de cette révision et contributions des deux membres |
+| C | Auxiliaire : entrées, cible, séparation, MAE, référence et arbre; accord prévu avant entraînement, non confirmé ici |
+| D | Auxiliaire : choix Tkinter et maquette imprimée; approbation prévue avant codage, non confirmée ici |
+| Contributions Git | L'historique inspecté contient six commits avec un seul auteur déclaré. La consigne demande des commits des deux membres; les contributions réelles du coéquipier restent à représenter |
+| Accès et dernier push | Confirmer l'accès du coéquipier, tester sous Windows et obtenir la CI verte sur le commit final |
+| Remise Moodle | Déposer le lien du dépôt public dans la boîte prévue; échéance à vérifier sur Moodle, non précisée dans le PDF fourni |
 
-L'étape 3 est implémentée et vérifiée dans l'environnement décrit. Les tests ne
-remplacent pas les accords pédagogiques; leurs dates ne seront inscrites qu'après
-les échanges réels. Les documents sont mis à jour par grande étape.
+Les dates des validations pédagogiques seront ajoutées après les échanges réels.
+La CI verte et les tests ne remplacent pas ces validations.
+
+## Étape 5 — Préparation de la présentation
+
+L'exposé dure cinq minutes, suivi de cinq minutes de questions. Les diapositives
+sont facultatives, avec quatre au maximum. La démo en direct reste obligatoire.
+La répartition suivante est une proposition à répéter, pas une trace de répétition
+ou de présentation déjà réalisée.
+
+| Temps | Qui | Contenu et action |
+|---|---|---|
+| 0:00–0:45 | Membre 1 | Présenter la question, la source, les cinq entrées et le nettoyage; montrer distribution_notes.png |
+| 0:45–1:45 | Membre 2 | Expliquer User_Score, l'arbre, la séparation par titres, la référence et les MAE 1,061 contre 0,763 |
+| 1:45–3:15 | Membre 1 | Démo : PC / Action / 2010 / T / presse 80; estimer, expliquer le trait, saisir abc, montrer le message, ouvrir l'historique |
+| 3:15–4:15 | Membre 2 | Expliquer les modules, l'héritage et la composition; défendre la validation séparée de Tkinter |
+| 4:15–4:30 | Membre 1 | Bilan : données anciennes, nombreuses lignes retirées et risques de biais |
+| 4:30–5:00 | Membre 2 | Bilan : difficulté d'environnement/imports, aide de l'IA déclarée et vérifiée, amélioration envisagée |
+
+Cela répartit environ 2 min 30 à chacun. Les deux doivent pouvoir expliquer tout
+le code, y compris les tests et les nouvelles bibliothèques. Préparer et
+chronométrer une répétition en échangeant aussi les rôles de la démo.
+
+### Démo et plan B
+
+Lancer `python src/main.py` avant l'exposé. Le cas normal ci-dessus donne environ
+**7,12/10** avec la sauvegarde fournie. Le repère orange indique cette estimation
+parmi les notes d'entraînement; il ne s'agit pas d'une probabilité de réussite.
+Remplacer ensuite la presse par `abc` : un message s'affiche et la note précédente
+est effacée. Ouvrir l'historique pour retrouver uniquement les estimations valides.
+
+Si le lancement échoue le jour de la présentation, ouvrir
+`donnees/demo_secours.pdf` : trois pages de captures de l'application, avec cas
+valide, erreur et historique. Les captures utilisent des saisies de démonstration
+et ne fournissent pas un faux historique à l'application. Ce PDF est un document
+statique : aucune bibliothèque PDF n'est nécessaire pour exécuter le projet.
+
+### Questions à savoir expliquer
+
+- **Comment apprend-il sans donner la réponse dans le formulaire ?** User_Score
+  est donné pendant l'entraînement comme cible; seules les cinq caractéristiques
+  sont reçues pour estimer un nouveau cas.
+- **Pourquoi retirer tbd et les lignes incomplètes ?** Ce ne sont pas des notes
+  utilisables; on n'invente pas la cible. Ce choix réduit l'échantillon et peut biaiser sa représentation.
+- **Pourquoi séparer par titre ?** Pour éviter que deux plateformes d'un même
+  jeu se retrouvent de part et d'autre et rendent l'évaluation trop favorable.
+- **Que signifie une MAE de 0,763 ?** L'erreur absolue moyenne sur les jeux de test
+  est d'environ 0,763 point sur 10; certains jeux ont une erreur beaucoup plus grande.
+- **Pourquoi la moyenne comme référence ?** Elle donne une prédiction triviale
+  indépendante des entrées, calculée sur train, à laquelle comparer le modèle.
+- **Où sont l'héritage et la composition ?** Les deux enfants de Variable
+  redéfinissent valider; le service contient le modèle, l'historique et les variables.
+- **Pourquoi le modèle n'apprend-il pas à chaque clic ?** Il recharge le pipeline
+  ajusté depuis joblib; le bouton valide puis appelle predict, sans fit.
+- **Qu'est-ce que le JSON décrit ?** Les entrées, catégories, intervalles, métriques,
+  distribution et versions; la fenêtre utilise ces descriptions.
+- **Que font lambda, between, __name__, classmethod et with ?** Il faut savoir
+  expliquer leur rôle dans les lignes concernées, en s'aidant des références et du cours.
+- **Comment l'IA a-t-elle été utilisée ?** Expliquer les propositions de code,
+  tests et débogage reçues, puis donner une vérification qui a changé une décision,
+  comme l'import direct ou la correction PyArrow, conformément au journal.
 
 ## Notes de cours et références
 
@@ -343,3 +442,8 @@ sont documentés ici :
 Les callbacks et les composants Tkinter sont les outils nouveaux de l'étape 3.
 Ils sont isolés dans interface.py; les fonctions de calcul et de validation
 restent testables avec les notions de fonctions, classes et exceptions du cours.
+
+Repères vérifiés dans les notes fournies : chapitre 7, « Fonctions lambda »
+(tri avec key); chapitre 11, « Classes abstraites » (ABC/abstractmethod) et
+« Composition ». Les callbacks et composants visuels restent des outils nouveaux,
+à expliquer avec la documentation officielle, comme le demande l'énoncé.
