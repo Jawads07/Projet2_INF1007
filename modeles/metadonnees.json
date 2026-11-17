@@ -1,0 +1,145 @@
+{
+  "format": 1,
+  "caracteristiques": [
+    "Platform",
+    "Genre",
+    "Year_of_Release",
+    "Rating",
+    "Critic_Score"
+  ],
+  "cible": "User_Score",
+  "echelle_cible": [
+    0,
+    10
+  ],
+  "variables": [
+    {
+      "nom": "Platform",
+      "type": "categorielle",
+      "valeurs": [
+        "3DS",
+        "DC",
+        "DS",
+        "GBA",
+        "GC",
+        "PC",
+        "PS",
+        "PS2",
+        "PS3",
+        "PS4",
+        "PSP",
+        "PSV",
+        "Wii",
+        "WiiU",
+        "X360",
+        "XB",
+        "XOne"
+      ]
+    },
+    {
+      "nom": "Genre",
+      "type": "categorielle",
+      "valeurs": [
+        "Action",
+        "Adventure",
+        "Fighting",
+        "Misc",
+        "Platform",
+        "Puzzle",
+        "Racing",
+        "Role-Playing",
+        "Shooter",
+        "Simulation",
+        "Sports",
+        "Strategy"
+      ]
+    },
+    {
+      "nom": "Year_of_Release",
+      "type": "numerique",
+      "minimum": 1985.0,
+      "maximum": 2016.0,
+      "entier": true
+    },
+    {
+      "nom": "Rating",
+      "type": "categorielle",
+      "valeurs": [
+        "AO",
+        "E",
+        "E10+",
+        "K-A",
+        "M",
+        "RP",
+        "T"
+      ]
+    },
+    {
+      "nom": "Critic_Score",
+      "type": "numerique",
+      "minimum": 13.0,
+      "maximum": 98.0,
+      "entier": false
+    }
+  ],
+  "modele": {
+    "type": "DecisionTreeRegressor",
+    "max_depth": 5,
+    "min_samples_leaf": 10,
+    "random_state": 42
+  },
+  "separation": {
+    "unite": "titre",
+    "proportion_test_titres": 0.2,
+    "graine": 42
+  },
+  "effectif_entrainement": 5454,
+  "moyenne_reference": 7.156857352401907,
+  "metrique": "MAE",
+  "evaluation": {
+    "mae_modele": 0.7625718829761297,
+    "mae_reference": 1.0609428872916447,
+    "gain_mae": 0.298371004315515,
+    "effectif_test": 1372
+  },
+  "distribution_cible_entrainement": {
+    "effectifs": [
+      5,
+      21,
+      65,
+      135,
+      238,
+      522,
+      917,
+      1678,
+      1647,
+      226
+    ],
+    "bornes": [
+      0.0,
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.0,
+      6.0,
+      7.0,
+      8.0,
+      9.0,
+      10.0
+    ]
+  },
+  "importance_variables": {
+    "Platform": 0.012844454866659565,
+    "Genre": 0.02597986380868332,
+    "Rating": 0.010976799394549763,
+    "Year_of_Release": 0.18554434063403427,
+    "Critic_Score": 0.764654541296073
+  },
+  "versions": {
+    "scikit_learn": "1.9.0",
+    "pandas": "3.0.3",
+    "numpy": "2.4.6",
+    "joblib": "1.5.3"
+  }
+}

@@ -1,17 +1,20 @@
-"""Point d'entrée — Étapes 1 et 2A, exécutable avec Run Python File."""
+"""Point d'entrée — Étapes 1 et 2, exécutable avec Run Python File."""
 
 import os
 
+import numpy as np
+
 from donnees import CARACTERISTIQUES, CIBLE, JeuDeDonnees
 from exceptions import DonneeInvalideError
-from graphiques import enregistrer_distribution_notes
+from graphiques import enregistrer_distribution_notes, enregistrer_predictions
+from modele import Modele
 
 
 def main() -> None:
-    """Charge, explore, nettoie et sépare les données; ne renvoie rien.
+    """Charge, prépare, entraîne, évalue et sauvegarde le modèle; ne renvoie rien.
 
     Affiche les erreurs attendues de fichier, d'encodage et de données.
-    Aucun modèle n'est entraîné dans ce lot.
+    Ce point d’entrée prépare le modèle; la future interface rechargera la sauvegarde.
     """
     dossier_src = os.path.dirname(os.path.abspath(__file__))
     dossier_projet = os.path.dirname(dossier_src)
@@ -55,7 +58,29 @@ def main() -> None:
         print("Titres d'entraînement :", entrainement["Name"].str.casefold().nunique())
         print("Titres de test :", test["Name"].str.casefold().nunique())
         print("Graine : 42 ; 20 % des titres réservés au test.")
-        print("Étape suivante : référence, encodage, entraînement et évaluation (lot 2B).")
+        # Étape 2B — Référence, apprentissage sur train et évaluation sur test.
+        modele = Modele()
+        modele.entrainer(entrainement)
+        evaluation = modele.evaluer(test)
+        print("\nMoyenne de référence :", round(modele.metadonnees["moyenne_reference"], 3))
+        print("MAE de référence :", round(evaluation["mae_reference"], 3))
+        print("MAE du modèle :", round(evaluation["mae_modele"], 3))
+        print("Réduction de MAE (positive si meilleure) :", round(evaluation["gain_mae"], 3))
+        print(modele)
+        chemin_predictions = os.path.join(dossier_projet, "donnees", "predictions_test.png")
+        enregistrer_predictions(test[CIBLE], modele.predire(test), chemin_predictions)
+
+        # Étape 2B — La sauvegarde contient aussi le prétraitement appris.
+        dossier_modeles = os.path.join(dossier_projet, "modeles")
+        modele.sauvegarder(dossier_modeles)
+        recharge = Modele.charger(dossier_modeles)
+        exemples = test.head(5)
+        if not np.array_equal(modele.predire(exemples), recharge.predire(exemples)):
+            raise DonneeInvalideError("Les prédictions changent après rechargement.")
+        print("Modèle et métadonnées enregistrés dans :", dossier_modeles)
+        print("Rechargement vérifié : mêmes prédictions, sans nouvel entraînement.")
+        print("Graphique d'évaluation enregistré :", chemin_predictions)
+        print("Étape suivante : interface locale (étape 3).")
     except (OSError, UnicodeDecodeError, DonneeInvalideError) as erreur:
         print("Impossible de préparer les données :", erreur)
 

@@ -98,6 +98,7 @@ def separer_donnees(
             raise DonneeInvalideError("Les colonnes numériques doivent être converties.")
     # Ignore la casse et les espaces extérieurs lors du regroupement des titres.
     groupes = donnees["Name"].astype("string").str.strip().str.casefold()
+    # Une liste Python évite de transmettre un tableau de chaînes PyArrow à sklearn.
     titres = groupes.unique().tolist()
     if len(titres) < 2:
         raise DonneeInvalideError("Il faut au moins deux titres différents.")

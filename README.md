@@ -2,115 +2,153 @@
 
 ## Objectif
 
-L'application prévue estimera la note moyenne des joueurs (`User_Score`, sur 10)
-à partir de cinq entrées : `Platform`, `Genre`, `Year_of_Release`, `Rating`
-(classification d'âge) et `Critic_Score` (note de presse sur 100).
-La note de presse est donc supposée déjà disponible. `Name` identifie les jeux
-pour la séparation, mais ne sera pas utilisé comme caractéristique prédictive.
+Estimer la note moyenne des joueurs (`User_Score`, sur 10) à partir de cinq
+caractéristiques : plateforme, genre, année de sortie, classification d'âge et
+note de la presse (`Critic_Score`, sur 100). Les critiques de presse sont donc
+supposées déjà disponibles. Le titre sert au regroupement des observations,
+mais n'est jamais une entrée du modèle. Les ventes ne sont pas utilisées.
 
-## !!! Organisation du travail en équipe !!!
 
-Nous utilisons l'extension Visual Studio Live Share pour travailler
-en binôme sur une même session VS Code.
+## Installation et exécution
 
-Certaines modifications sont réalisées et relues ensemble avant
-d'être regroupées dans un commit correspondant à une partie cohérente
-du projet.
-
-L'auteur affiché dans Git correspond à la personne ayant créé le
-commit; il ne représente donc pas nécessairement l'unique participant
-aux modifications effectuées pendant la session.
-
-## Installation et lancement
-
-Depuis le dossier principal, avec le même Python pour les deux commandes :
+Depuis le dossier principal, avec le même interpréteur Python :
 
 ```powershell
 python -m pip install -r requirements.txt
+python -m pytest
 python src/main.py
 ```
 
-Dans VS Code, sélectionner ce même interpréteur puis utiliser **Run Python File**
-sur `src/main.py`. Les chemins sont construits avec `os` à partir de `__file__` :
-le lancement ne dépend pas du répertoire courant du terminal.
-Un environnement virtuel est possible, mais pas obligatoire. Anaconda est utilisé
-sur le poste de développement de l'équipe; la CI est configurée pour Python 3.14.
-Les vérifications disponibles ont été réalisées sous Python 3.12;
-le lancement sous Python 3.14 reste à confirmer sur le poste de l’équipe et en CI.
+Dans VS Code, **Run Python File** sur `src/main.py` fonctionne également.
+Un environnement virtuel est facultatif. Le poste de l'équipe utilise Anaconda
+avec Python 3.14; les vérifications décrites ci-dessous ont été réalisées sous
+Python 3.12. La CI est configurée pour Python 3.14 et doit être vérifiée après push.
 
-## Étape 0 — Mise en place
+`main.py` est actuellement le script de préparation : il entraîne le modèle,
+l'évalue et régénère ses fichiers. L'interface de l'étape 3 utilisera
+`Modele.charger` sans lire le CSV ni réentraîner à chaque lancement.
 
-Dépôt prévu public et partagé : https://github.com/Jawads07/Projet2_INF1007
-L'équipe doit confirmer l'invitation du coéquipier et la visibilité publique.
-Le workflow `.github/workflows/tests.yml` installe les dépendances et exécute les
-tests à chaque push. La version précédente avait une CI verte; la nouvelle
-exécution doit être vérifiée après l’envoi des changements.
+## Étape 0 — Organisation
 
-## Étape 1 — Domaine, données et exploration
+Le dépôt prévu public et partagé est https://github.com/Jawads07/Projet2_INF1007.
+Le workflow exécute pytest et mesure la couverture après chaque push. `pytest.ini`
+indique où trouver les modules (`src`) et les tests (`tests`), afin de conserver
+les mêmes imports simples dans le code et dans les tests.
 
-- Fichier original : `donnees/Video_Games.csv`.
+!!! Organisation du travail en équipe !!!
+Nous utilisons l'extension Visual Studio Live Share pour travailler en binôme sur une même session VS Code.
+
+Certaines modifications sont réalisées et relues ensemble avant d'être regroupées dans un commit correspondant à une partie cohérente du projet.
+
+L'auteur affiché dans Git correspond à la personne ayant créé le commit; il ne représente donc pas nécessairement l'unique participant aux modifications effectuées pendant la session.
+
+## Étape 1 — Données et exploration
+
+- Fichier original : `donnees/Video_Games.csv`, 16 719 observations et 16 colonnes,
+  environ 1,62 Mo.
 - Source : https://www.kaggle.com/datasets/ibriiee/video-games-sales-dataset-2022-updated-extra-feat
-- Licence annoncée sur cette fiche : CC0, domaine public.
-- Dimensions vérifiées : 16 719 observations et 16 colonnes, environ 1,62 Mo.
-- Entrées mixtes : trois catégorielles et deux numériques; cible numérique claire.
-- Les colonnes utilisées décrivent des jeux et ne contiennent pas d'identifiants personnels.
-- Les données retenues concernent les années 1985 à 2016 : elles ne représentent
-  pas automatiquement le marché actuel. Les validations A et B restent à présenter
-  si elles n'ont pas encore été effectuées.
+- Licence annoncée sur la fiche source : CC0, domaine public.
+- Données tabulaires avec cinq entrées : trois catégorielles et deux numériques;
+  cible numérique claire, sans données identifiant une personne dans les colonnes utilisées.
+- Graphique enregistré : `donnees/distribution_notes.png`. Les observations
+  conservées se concentrent surtout entre 6 et 9. Les faibles notes sont rares.
+- Une observation représente un titre sur une plateforme, pas forcément un titre unique.
 
-Le graphique `donnees/distribution_notes.png` est enregistré par `savefig` et sera
-montré lors de la présentation. Il compte les observations après nettoyage,
-chaque ligne correspondant à un jeu sur une plateforme. Les notes se concentrent
-entre 6 et 9, surtout entre 7 et 9. Les faibles notes sont peu représentées.
+Les validations A (domaine) et B (données) sont à confirmer avec l'auxiliaire.
 
-## Étape 2 — Préparation des données (partie A)
+## Étape 2A — Préparation et séparation
 
-### Chargement et nettoyage
-
-`charger_donnees` vérifie l'existence du fichier, l'ouvre avec `with`, puis le lit
-avec pandas. Une erreur métier claire signale un CSV vide ou mal formé.
-`nettoyer_donnees` travaille sur une copie et :
-
-1. conserve le titre, les cinq entrées et la cible;
-2. retire les espaces extérieurs des titres et catégories et reconnaît les champs vides;
-3. convertit année et notes avec `to_numeric(errors="coerce")` : un texte comme `tbd`
-   devient une valeur manquante;
-4. retire les observations incomplètes dans les colonnes retenues;
-5. vérifie une année finie, entière et positive, la presse dans [0, 100] et les
-   joueurs dans [0, 10], bornes incluses.
+Le chargement vérifie l'existence du CSV et utilise `with`. Le nettoyage travaille
+sur une copie : sélection des cinq entrées, de la cible et du titre; retrait des
+espaces extérieurs; conversion numérique avec `to_numeric(errors="coerce")`;
+retrait des lignes incomplètes. Les notes doivent respecter [0,100] pour la presse
+et [0,10] pour les joueurs, bornes incluses. L'année doit être finie, entière et positive.
+Le CSV et le tableau original ne sont pas modifiés.
 
 Résultat reproduit : **6 826 observations conservées, 9 893 retirées**.
-Ni le fichier CSV ni le tableau original reçu par la fonction ne sont modifiés.
-Aucune moyenne n'est utilisée pour inventer une cible manquante. La suppression
-d'une grande partie des observations peut toutefois introduire un biais de
-sélection. Des valeurs manquantes dans les colonnes inutilisées n'excluent pas un jeu.
+Les valeurs manquantes de colonnes inutilisées ne font pas exclure une observation.
+La suppression de nombreuses lignes peut créer un biais de sélection.
+Les données conservées concernent les années 1985 à 2016 et ne représentent donc
+pas automatiquement les jeux récents.
 
-### Séparation reproductible
-
-`train_test_split` réserve **20 % des titres uniques**, avec `random_state=42`.
-Les titres sont regroupés sans distinction de casse ni espaces extérieurs.
-Toutes les plateformes d'un même titre restent du même côté : cela réduit le
-risque de retrouver un jeu presque identique pendant l'entraînement et le test.
-Cette règle ne garantit pas l'absence de liens entre remakes ou jeux d'une même série.
-
-Résultat avec le CSV fourni :
+`train_test_split` répartit les titres uniques : **20 % des titres pour le test,
+graine 42**, sans titre commun entre les ensembles. Toutes les plateformes d'un
+même titre restent du même côté; la casse et les espaces extérieurs sont ignorés
+pour ce regroupement. La conversion des titres uniques en liste Python évite une
+incompatibilité d'indexation PyArrow. La règle ne détecte pas les liens entre des
+remakes ou des jeux différents d'une même série.
 
 | Ensemble | Observations | Titres regroupés |
 |---|---:|---:|
 | Entraînement | 5 454 | 3 502 |
 | Test | 1 372 | 876 |
 
-Les proportions de lignes peuvent différer de 80/20, car on répartit les titres.
-La sélection de colonnes, les conversions et les règles d'échelle sont fixes :
-elles n'apprennent pas de paramètres sur le test. L'encodage des catégories sera
-ajusté seulement sur l'entraînement dans le lot 2B.
+Le nettoyage utilise des règles fixes et n'apprend aucun paramètre statistique sur
+le test. Les catégories et paramètres du modèle sont appris seulement après séparation.
 
-La classe `JeuDeDonnees` contient les données brutes et nettoyées, protège son état
-par des attributs internes et renvoie des copies via ses propriétés. Sa méthode
-spéciale `__str__` donne un résumé lisible. `DonneeInvalideError` est levée pour les
-erreurs métier et interceptée dans `main` avec des exceptions précises.
+## Étape 2B — Référence, apprentissage et évaluation
 
-### Tests
+### Référence et modèle
+
+La référence `DummyRegressor(strategy="mean")` prédit toujours la moyenne des notes
+d'entraînement : **7,156857/10**. Elle ignore les caractéristiques.
+
+L'arbre de régression a une profondeur maximale de **5**, au moins **10 observations
+par feuille** et une graine de **42**. Ces réglages ont été fixés avant d'observer
+le score de test, sans recherche de paramètres sur ce test. La profondeur limite
+la complexité; le minimum de dix observations évite des feuilles fondées sur un
+seul exemple. L'arbre utilise le critère d'entraînement par défaut, erreur quadratique,
+et prédit la moyenne des observations de chaque feuille.
+
+Les catégories sont transformées par `OneHotEncoder(handle_unknown="ignore")` :
+une colonne binaire par catégorie, sans introduire d'ordre artificiel entre les
+plateformes. Une catégorie inconnue ne provoque pas de nouvel apprentissage.
+Les deux entrées numériques sont transmises sans normalisation, qui n'est pas
+nécessaire pour les seuils d'un arbre. `ColumnTransformer` et `Pipeline` regroupent
+le prétraitement et l'arbre : un seul `fit` est réalisé sur l'entraînement.
+`Name` et `User_Score` sont explicitement exclus des entrées.
+
+### Métrique et résultats
+
+La métrique est l'**erreur absolue moyenne (MAE)**, en points sur 10 :
+`mean(abs(notes_reelles - notes_predites))`. Le calcul utilise NumPy sans boucle
+Python et un test vérifie sa concordance avec `mean_absolute_error` de scikit-learn.
+Une MAE plus faible est meilleure; ce n'est ni un pourcentage de réussite ni un
+intervalle de confiance pour chaque prédiction.
+
+| Méthode | MAE sur les 1 372 observations de test |
+|---|---:|
+| Moyenne d'entraînement | 1,060943 |
+| Arbre de décision | 0,762572 |
+| Réduction de MAE | 0,298371 |
+
+Ces valeurs ont été reproduites avec scikit-learn 1.8.0 et 1.9.1 dans les deux
+environnements de vérification. Le graphique `donnees/predictions_test.png`
+compare les notes prédites aux notes réelles. La diagonale représente la prédiction
+parfaite. Les bandes horizontales viennent des valeurs constantes prédites dans
+les feuilles de l'arbre. Les faibles notes peuvent être fortement surestimées :
+la MAE globale ne garantit pas la même qualité pour tous les jeux.
+
+### Sauvegarde et métadonnées
+
+- `modeles/modele.joblib` : classe Modele, pipeline déjà ajusté et référence.
+- `modeles/metadonnees.json` : cinq entrées dans l'ordre, catégories et intervalles
+  observés **dans l'entraînement**, cible, métriques, réglages et versions.
+- Le JSON contient aussi la distribution de cible d'entraînement et les importances
+  regroupées par variable, pour le futur graphique d'interface. Une importance
+  reflète le découpage appris par l'arbre, pas une relation causale.
+
+Un contrôle vérifie que le rechargement produit les mêmes prédictions sans `fit`.
+Le chargement vérifie la correspondance entre modèle et JSON et la version de
+scikit-learn. Si cette version diffère, relancer `python src/main.py` avec le Python
+local pour recréer **ensemble** les deux fichiers. Le modèle inclus dans l'archive
+a été généré avec scikit-learn 1.9.1; ne pas supposer sa compatibilité avec une autre
+version. Charger seulement les sauvegardes de confiance produites par le projet.
+
+La validation C (cible, métrique et modèle) n'est pas déclarée effectuée; la fiche
+de décisions contient les choix à présenter. Aucun accord de l'auxiliaire n'est inventé.
+
+## Tests et couverture
 
 ```powershell
 python -m pytest
@@ -118,83 +156,95 @@ python -m coverage run --source=src -m pytest
 python -m coverage report -m
 ```
 
-`pytest.ini` indique à pytest de chercher les modules dans `src` et les tests dans
-`tests`. Le code et les tests utilisent donc les mêmes imports simples.
-La configuration est expliquée dans DECISIONS.md. Les tests se lancent avec pytest, pas avec
-Run Python File.
-34 cas de test passent dans l’environnement de vérification. La couverture unitaire
-est de 60 % pour src et de 100 % des instructions pour donnees.py et exceptions.py.
-Le point d’entrée et les graphiques ont aussi été exécutés séparément.
-La couverture ne concerne que les instructions parcourues par les tests, pas
-la qualité des prédictions. La nouvelle CI reste à vérifier après push.
+**65 cas passent** avec pandas 3.1.1 et PyArrow. Avec pandas 2.2.3 sans PyArrow :
+**64 passent et 1 est ignoré**, car ce test cible un stockage optionnel absent.
+Les tests couvrent les fichiers, le nettoyage, les bornes, les copies, la séparation,
+la MAE, la référence, la protection contre l'évaluation sur train, les catégories
+inconnues, l'exclusion de la cible, la sauvegarde et le rechargement.
 
-## Travail restant
+Couverture unitaire mesurée : **73 % des instructions de src**; données et
+exceptions 100 %, modèle 99 %. Le point d'entrée et les graphiques ont été exécutés
+séparément et inspectés; ils ne sont pas inclus dans cette couverture unitaire.
+Aucun seuil n'est exigé par les consignes. Une CI verte de cette révision reste à
+confirmer sur GitHub après push.
 
-- **2B** : référence prédisant la moyenne d'entraînement, encodage, modèle simple,
-  métrique MAE calculée avec NumPy et comparée à scikit-learn, évaluation, sauvegarde
-  joblib et métadonnées JSON. Validation C : cible, métrique et modèle à justifier.
-- **3** : `interface.py` pour l'interface locale, maquette et validation D, saisies
-  numériques et catégorielles construites depuis les métadonnées, validation,
-  prédiction, graphique et historique. Compléter héritage, polymorphisme et composition.
-- **4** : audit de toutes les exigences, couverture finale, références, documents,
-  essai d'installation propre et CI finale verte. Ajouter un outil pertinent du chapitre 7.
-- **5** : cinq minutes de présentation puis cinq minutes de questions, parole
-  partagée, démo normale et invalide, graphique et plan B.
+Vérifications sous Python 3.12.14 :
 
-Le modèle et l’interface ne sont pas encore implémentés.
+| Bibliothèque | Environnement de base | Environnement récent |
+|---|---|---|
+| pandas | 2.2.3 | 3.1.1 |
+| NumPy | 2.3.5 | 2.5.5 |
+| scikit-learn | 1.8.0 | 1.9.1 |
+| joblib | 1.5.3 | 1.6.0 |
+| Matplotlib | 3.10.8 | 3.11.2 |
+| pytest / coverage | 9.2.0 / 7.17.3 | 9.2.0 / 7.17.3 |
 
-## Organisation
+PyArrow 26.0.1 est présent seulement dans le second environnement. Les versions
+ne sont pas imposées dans requirements.txt; les tests doivent être relancés après
+installation. Le test spécifique à PyArrow est ignoré s'il n'est pas installé.
 
-| Emplacement | Rôle |
+## Organisation et choix techniques
+
+| Fichier ou dossier | Rôle |
 |---|---|
-| `src/donnees.py` | Étapes 1 et 2A : chargement, nettoyage, séparation et classe des données |
-| `src/exceptions.py` | Exception métier personnalisée |
-| `src/graphiques.py` | Graphique d'exploration; distinct de la future interface |
-| `src/main.py` | Appels successifs et affichage des résultats |
-| `src/modele.py` | Sera créé pour le modèle à l’étape 2B |
-| `donnees/` | CSV original et histogramme |
-| `modeles/` | Réservé au modèle sauvegardé et aux métadonnées |
-| `tests/` | Tests automatisés de la logique |
-| `DECISIONS.md`, `JOURNAL_IA.md` | Choix, validations et aide reçue |
+| `src/donnees.py` | Chargement, nettoyage, séparation; classe JeuDeDonnees |
+| `src/modele.py` | Référence, pipeline, métrique, évaluation et persistance; classe Modele |
+| `src/exceptions.py` | DonneeInvalideError, levée puis interceptée explicitement |
+| `src/graphiques.py` | Figures d'exploration et d'évaluation |
+| `src/main.py` | Appels dans l'ordre du travail; lancement direct dans VS Code |
+| `donnees/` | CSV original et graphiques enregistrés |
+| `modeles/` | Modèle ajusté et métadonnées JSON |
+| `tests/` | Tests pytest de la logique |
+| `pytest.ini` | Recherche des modules dans src et des tests dans tests |
 
-## Dépendances et configuration
+Les méthodes ont des annotations et docstrings. Les calculs renvoient leurs
+résultats, l'affichage est dans main. Les classes conservent leur état dans des
+attributs internes; les propriétés renvoient des copies. Modele contient ses
+objets pipeline et référence (composition), et redéfinit `__str__`.
+Outil du chapitre 7 : la clé **lambda** trie les catégories des métadonnées sans
+distinction de casse, pour des listes déroulantes lisibles et stables.
 
-`requirements.txt` contient seulement les noms des bibliothèques utilisées :
+`requirements.txt` contient pandas (tableaux), numpy (calculs vectorisés),
+scikit-learn (modèles), joblib (sauvegarde), matplotlib (figures), pytest et coverage
+(vérification). `joblib` est déclaré explicitement, même s'il peut être installé
+par scikit-learn, car le code l'importe directement. `os`, `copy`, `json` et
+`pickle` sont fournis avec Python. `pytest.ini` est facultatif en général, mais
+retenu ici pour éviter de modifier sys.path et conserver le lancement direct.
 
-| Bibliothèque | Utilisation |
-|---|---|
-| pandas | Lecture et nettoyage des tableaux |
-| NumPy | Vérification vectorisée des années finies; calcul de métrique prévu ensuite |
-| scikit-learn | Séparation des titres avec train_test_split |
-| Matplotlib | Histogramme enregistré |
-| pytest | Tests automatiques |
-| coverage | Mesure de la couverture des tests |
+## Suite du projet
 
-Aucune version minimale n'est imposée dans ce fichier. Les vérifications actuelles
-ont utilisé pandas 2.2.3, NumPy 2.3.5, scikit-learn 1.8.0, Matplotlib 3.10.8,
-pytest 9.2.0 et coverage 7.17.3 sous Python 3.12.14. Une installation sur un autre
-Python peut choisir d'autres versions compatibles; il faut alors relancer les tests.
-`os` est fourni avec Python : il ne doit pas être installé.
+- Étape 3 : choix de technologie et maquette à présenter pour D, `interface.py`,
+  saisies construites depuis le JSON, contrôles de champs et d'intervalles,
+  prédiction, graphique Matplotlib et historique. Compléter les classes exigées,
+  notamment la classe parente et deux enfants avec redéfinition de méthode.
+- Étape 4 : audit complet, installation dans un dossier neuf, couverture finale,
+  documents finalisés, contributions réelles des deux membres et CI finale verte.
+- Étape 5 : cinq minutes d'exposé puis cinq minutes de questions, démo normale,
+  saisie invalide, graphique, parole partagée et plan B.
 
-`pytest.ini` est le seul fichier de configuration ajouté pour les imports des tests :
-`pythonpath = src` permet d'importer les modules comme dans main.py;
-`testpaths = tests` indique où chercher les tests. Ce fichier n'est pas imposé par
-l'énoncé. Il évite des imports différents et conserve le lancement direct dans VS Code.
+L'interface n'est pas encore implémentée. L'historique des prédictions et
+l'héritage/polymorphisme sont donc encore à compléter. Les trois documents sont
+mis à jour par grande étape, sans inventer de validations ou de résultats.
 
-## Notes de cours et documentation officielle
+## Notes de cours et références
 
-- Ch. 5 : fichiers, `with`, chemins avec `os`.
-- Ch. 6–7 : fonctions, annotations, docstrings et modules.
-- Ch. 8 : exceptions, pytest et intégration continue.
-- Ch. 9–11 : classes, encapsulation, propriétés et méthodes spéciales.
-- Ch. 12–13 : tableaux, graphiques et lecture des documentations.
+Les fichiers et os sont issus du chapitre 5, les fonctions et modules des
+chapitres 6–7, les tests et exceptions du chapitre 8, les classes/propriétés des
+chapitres 9–11, NumPy et figures des chapitres 12–13. Les outils supplémentaires
+sont documentés ici :
+
 - pandas, lecture : https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html
 - pandas, conversion : https://pandas.pydata.org/docs/reference/api/pandas.to_numeric.html
 - pandas, valeurs manquantes : https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.dropna.html
-- scikit-learn, séparation : https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html
-- pytest, configuration : https://docs.pytest.org/en/stable/reference/customize.html
-- Matplotlib, histogramme : https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.hist.html
-- GitHub Actions : https://docs.github.com/en/actions/tutorials/build-and-test-code/python
+- Séparation : https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html
+- Référence : https://scikit-learn.org/stable/modules/generated/sklearn.dummy.DummyRegressor.html
+- Encodage : https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.OneHotEncoder.html
+- Pipeline et colonnes : https://scikit-learn.org/stable/modules/compose.html
+- Arbre : https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeRegressor.html
+- MAE : https://scikit-learn.org/stable/modules/generated/sklearn.metrics.mean_absolute_error.html
+- Sauvegarde : https://scikit-learn.org/stable/model_persistence.html
+- pytest : https://docs.pytest.org/en/stable/reference/customize.html
+- Histogramme : https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.hist.html
+- CI : https://docs.github.com/en/actions/tutorials/build-and-test-code/python
 
-La référence de la technologie d'interface et les résultats du modèle seront
-ajoutés lors des lots concernés. Aucun score de modèle n'a encore été mesuré.
+La documentation de la technologie d'interface sera ajoutée au choix de l'étape 3.

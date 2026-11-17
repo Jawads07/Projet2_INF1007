@@ -113,11 +113,15 @@ def creer_jeu_multiplateforme() -> pd.DataFrame:
     return nettoyer_donnees(pd.DataFrame(lignes))
 
 
-def test_separation_complete_sans_fuite_de_titres() -> None:
+@pytest.mark.parametrize("stockage", ["python", "pyarrow"])
+def test_separation_complete_sans_fuite_de_titres(stockage: str) -> None:
     """Chaque observation est affectée une fois, et aucun titre ne traverse la séparation."""
-    source = creer_jeu_multiplateforme()
-    avant = source.copy(deep=True)
-    entrainement, test = separer_donnees(source)
+    if stockage == "pyarrow":
+        pytest.importorskip("pyarrow", reason="Stockage optionnel des chaînes pandas")
+    with pd.option_context("mode.string_storage", stockage):
+        source = creer_jeu_multiplateforme()
+        avant = source.copy(deep=True)
+        entrainement, test = separer_donnees(source)
     noms_train = set(entrainement["Name"].str.casefold())
     noms_test = set(test["Name"].str.casefold())
     assert noms_train.isdisjoint(noms_test)
